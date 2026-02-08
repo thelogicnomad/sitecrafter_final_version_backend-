@@ -7,6 +7,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Multiple API keys for rotation
 const apiKeys = [
+    process.env.gemini13,
+    process.env.gemini12,
     process.env.gemini8,
     process.env.gemini9,
     process.env.gemini10,

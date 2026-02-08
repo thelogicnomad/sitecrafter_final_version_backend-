@@ -7,6 +7,7 @@ import { WebsiteState, ProjectBlueprint } from '../graph-state';
 import { storeBlueprintMemory, clearProjectMemory, generateProjectId } from '../memory-utils';
 import { fetchProjectImages, storeImagesInMemory, UnsplashImage } from '../services/image.service';
 import { PlanningService } from '../../../services/planning-fixed.service';
+import { generateDynamicTheme } from '../../../services/dynamic-trends.service';
 
 // Complete list of dependencies
 const STANDARD_DEPENDENCIES: Record<string, string> = {
@@ -126,16 +127,31 @@ export async function blueprintNode(state: WebsiteState): Promise<Partial<Websit
             console.error(` Image fetching failed: ${imgError.message} - will use gradients`);
         }
 
+        // Generate unique dynamic theme for this project
+        const dynamicTheme = generateDynamicTheme(state.userPrompt);
+        console.log(`\n Dynamic Theme Generated: ${dynamicTheme.palette.name}`);
+        console.log(`    Layout: ${dynamicTheme.layout.name}`);
+        console.log(`    Animation: ${dynamicTheme.animation.name}`);
+        console.log(`    Extended Packages: ${Object.keys(dynamicTheme.extendedPackages).join(', ')}`);
+
+        // Merge extended packages into blueprint dependencies
+        blueprint.dependencies = {
+            ...blueprint.dependencies,
+            ...dynamicTheme.extendedPackages
+        };
+
         return {
             blueprint,
             projectId,
             availableImages,
+            dynamicTheme,  // Pass theme to other nodes
             detailedContext: planBlueprint.detailedContext || '',
             workflowNodes: planBlueprint.workflow?.nodes || [],
             workflowEdges: planBlueprint.workflow?.edges || [],
             currentPhase: 'blueprint',
             messages: [
                 ` Autonomous Planning Complete: ${blueprint.projectName}`,
+                ` Theme: ${dynamicTheme.palette.name} + ${dynamicTheme.layout.name}`,
                 ` ${blueprint.pages.length} pages dynamically determined`,
                 ` ${blueprint.features.length} features identified`,
                 ` ${availableImages.length} images ready`
@@ -152,12 +168,37 @@ export async function blueprintNode(state: WebsiteState): Promise<Partial<Websit
  * Extract pages using LLM - truly dynamic, project-specific page generation
  * This replaces the old keyword-based approach with intelligent LLM analysis
  */
+
+// Multiple API keys for rotation in blueprint node
+const blueprintApiKeys = [
+    process.env.gemini8,
+    process.env.gemini9,
+    process.env.gemini10,
+    process.env.gemini11,
+    process.env.gemini,
+    process.env.gemini3,
+    process.env.gemini4,
+    process.env.gemini7,
+    process.env.gemini6,
+    process.env.gemini5,
+    process.env.gemini2,
+].filter(key => key && key.length > 0) as string[];
+
+let blueprintKeyIndex = 0;
+
+function getBlueprintApiKey(): string {
+    return blueprintApiKeys[blueprintKeyIndex] || process.env.gemini2 || '';
+}
+
+function rotateBlueprintKey(): void {
+    if (blueprintApiKeys.length > 1) {
+        blueprintKeyIndex = (blueprintKeyIndex + 1) % blueprintApiKeys.length;
+        console.log(`[Blueprint] Rotated to key ${blueprintKeyIndex + 1}/${blueprintApiKeys.length}`);
+    }
+}
+
 async function extractPagesWithLLM(userPrompt: string, detailedContext: string, features: any[]): Promise<any[]> {
     const OpenAI = (await import('openai')).default;
-    const openai = new OpenAI({
-        apiKey: process.env.gemini2,
-        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
-    });
 
     const featureNames = features.map(f => typeof f === 'string' ? f : f.name || f).join(', ');
 
@@ -170,9 +211,9 @@ IDENTIFIED FEATURES: ${featureNames}
 DETAILED CONTEXT (excerpt):
 ${detailedContext.slice(0, 6000)}
 
-═══════════════════════════════════════════════════════════════
+===================================================================
 CRITICAL RULES:
-═══════════════════════════════════════════════════════════════
+===================================================================
 
 1. Pages must be UNIQUE to THIS specific project type
 2. DO NOT use generic pages unless explicitly needed
@@ -212,7 +253,7 @@ For "Fitness tracking app":
 - ProfilePage (/profile) - User stats
  NOT: BlogPage, TestimonialsPage
 
-═══════════════════════════════════════════════════════════════
+===================================================================
 
 Now, for the project "${userPrompt}", generate 5-8 UNIQUE pages.
 
@@ -234,34 +275,47 @@ IMPORTANT:
 - Use descriptive, project-specific names (e.g., "ChatPage" not "MainPage")
 - Include 5-8 pages total`;
 
-    try {
-        const response = await openai.chat.completions.create({
-            model: "gemini-2.5-flash-lite-preview-09-2025",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are a web architect who creates unique, project-specific page structures. You NEVER use generic templates. Return ONLY valid JSON arrays."
-                },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.7
-        });
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const openai = new OpenAI({
+                apiKey: getBlueprintApiKey(),
+                baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+            });
 
-        const content = response.choices[0].message.content || '[]';
+            const response = await openai.chat.completions.create({
+                model: "gemini-2.5-flash-lite-preview-09-2025",
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are a web architect who creates unique, project-specific page structures. You NEVER use generic templates. Return ONLY valid JSON arrays."
+                    },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.7
+            });
 
-        // Extract JSON from response
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-            const pages = JSON.parse(jsonMatch[0]);
-            console.log(`    LLM generated ${pages.length} unique pages for this project`);
-            return pages;
+            const content = response.choices[0].message.content || '[]';
+
+            // Extract JSON from response
+            const jsonMatch = content.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                const pages = JSON.parse(jsonMatch[0]);
+                console.log(`    LLM generated ${pages.length} unique pages for this project`);
+                return pages;
+            }
+        } catch (error: any) {
+            console.error(`[Blueprint] Attempt ${attempt} failed:`, error.message);
+            rotateBlueprintKey();
+            if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 1000 * attempt));
+                continue;
+            }
         }
-    } catch (error: any) {
-        console.error('    LLM page extraction failed:', error.message);
     }
 
-    // Minimal fallback - ONLY if LLM fails
-    console.log('    Using minimal fallback pages');
+    // Minimal fallback - ONLY if all retries fail
+    console.log('    LLM page extraction failed, using minimal fallback pages');
     return [
         {
             name: 'HomePage',

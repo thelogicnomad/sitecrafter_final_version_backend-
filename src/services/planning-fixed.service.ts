@@ -1,6 +1,7 @@
 import type { PlanningResponse, ProjectBlueprint } from '../types/planning.types';
 import { OutputParser } from '../utils/parser.utils';
 import { UIService } from './ui.service';
+import { generateDynamicTheme, formatThemeForPrompt, generateResponsivePatterns, DynamicDesignTheme } from './dynamic-trends.service';
 import OpenAI from "openai";
 
 // Initialize OpenAI client with Gemini API
@@ -901,6 +902,16 @@ REMEMBER: The detailedContext is passed to code generation AI. It must be SO com
       console.log(`  LLM will intelligently determine all features and packages needed`);
       console.log(`\n Generating production-level blueprint (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
 
+      // Generate UNIQUE dynamic design theme for this project
+      const dynamicTheme = generateDynamicTheme(requirements);
+      const themePrompt = formatThemeForPrompt(dynamicTheme);
+      const responsivePatterns = generateResponsivePatterns(projectType);
+
+      console.log(`  Dynamic Theme: ${dynamicTheme.palette.name}`);
+      console.log(`  Layout Pattern: ${dynamicTheme.layout.name}`);
+      console.log(`  Animation Style: ${dynamicTheme.animation.name}`);
+      console.log(`  Extended Packages: ${Object.keys(dynamicTheme.extendedPackages).join(', ')}`);
+
       // Create analysis object for system prompt
       const analysisForPrompt = {
         type: projectType,
@@ -913,9 +924,16 @@ REMEMBER: The detailedContext is passed to code generation AI. It must be SO com
 
 "${requirements}"
 
+${themePrompt}
+
+${responsivePatterns}
+
 === YOUR MISSION ===
 
 Design a PRODUCTION-READY, ENTERPRISE-GRADE, FEATURE-RICH application that WOWS users. Think professional SaaS product worthy of real deployment, not tutorial project.
+
+CRITICAL: YOU MUST USE THE EXACT DESIGN THEME PROVIDED ABOVE (${dynamicTheme.palette.name}). 
+DO NOT default to purple/indigo. Use the EXACT colors, fonts, and patterns specified.
 
 ${projectType === 'backend' ? `
 **BACKEND-ONLY PROJECT:**
@@ -930,10 +948,11 @@ DO NOT include any frontend/UI components. Focus ONLY on:
 ` : `
 **CRITICAL FIRST IMPRESSION:**
 This is the first version - make it AMAZING:
-- Think about what BEAUTIFUL designs this evokes
-- List features you'll implement in this first version
-- Choose inspiring colors, fonts, animations
-- Make it MEMORABLE and UNIQUE
+- USE THE EXACT COLORS from theme "${dynamicTheme.palette.name}" above
+- Apply the "${dynamicTheme.layout.name}" layout pattern
+- Use "${dynamicTheme.animation.name}" animations
+- Install these packages: ${Object.keys(dynamicTheme.extendedPackages).join(', ')}
+- Make it MEMORABLE and UNLIKE any other project
 
 **ALWAYS CREATE MULTIPLE PAGES:**
 Even for simple requests, design 3-5 pages minimum:
@@ -946,6 +965,7 @@ Even for simple requests, design 3-5 pages minimum:
 `}
 
 === COMPREHENSIVE SPECIFICATIONS REQUIRED ===
+
 
 1. **Deep Requirements Analysis:**
    - Core features (stated requirements)

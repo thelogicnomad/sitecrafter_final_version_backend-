@@ -59,6 +59,77 @@ EVERY page MUST follow these CRITICAL rules to prevent runtime errors:
    import React, { useState } from 'react';
 
 ═══════════════════════════════════════════════════════════════════════════════
+ PRODUCTION-LEVEL PREMIUM UI - MANDATORY
+═══════════════════════════════════════════════════════════════════════════════
+
+**EVERY website MUST look like a $10,000 professional production site:**
+
+1. **NO SQUARE BOXES ANYWHERE:**
+   - ALL cards: rounded-xl or rounded-2xl (NEVER rounded or no rounding)
+   - ALL buttons: rounded-lg or rounded-xl
+   - ALL images/placeholders: rounded-xl or rounded-2xl with overflow-hidden
+   - ALL modals: rounded-2xl
+   - Example: className="rounded-2xl overflow-hidden shadow-lg"
+
+2. **PREMIUM SHADOWS AND DEPTH:**
+   - Cards: shadow-lg or shadow-xl
+   - Hover effects: hover:shadow-2xl with transition
+   - Floating elements: shadow-2xl
+
+3. **PREMIUM ANIMATIONS (use framer-motion):**
+   <motion.div
+     initial={{ opacity: 0, y: 20 }}
+     animate={{ opacity: 1, y: 0 }}
+     transition={{ duration: 0.5, ease: "easeOut" }}
+     whileHover={{ scale: 1.02, y: -4 }}
+   >
+
+4. **GRADIENT BACKGROUNDS (not flat colors):**
+   - Heroes: bg-gradient-to-br from-[primary] via-[secondary] to-[accent]
+   - Cards: subtle gradients or glass effects
+   - Buttons: bg-gradient-to-r with hover shift
+
+5. **CREATIVE UNIQUE LAYOUTS:**
+   - Asymmetric grids, overlapping elements
+   - Bento box layouts, split screens
+   - Full-bleed images with text overlays
+   - Floating cards with tilts
+
+═══════════════════════════════════════════════════════════════════════════════
+ WORKING BUTTONS - ALL BUTTONS MUST BE FUNCTIONAL
+═══════════════════════════════════════════════════════════════════════════════
+
+**EVERY button MUST have a working onClick handler:**
+
+// For navigation buttons - use Link:
+import { Link, useNavigate } from 'react-router-dom';
+<Link to="/about">
+  <Button>Learn More</Button>
+</Link>
+
+// Or useNavigate:
+const navigate = useNavigate();
+<Button onClick={() => navigate('/contact')}>Contact Us</Button>
+
+// For action buttons - use useState:
+const [isOpen, setIsOpen] = useState(false);
+<Button onClick={() => setIsOpen(true)}>Open Modal</Button>
+
+// For form buttons:
+const [submitted, setSubmitted] = useState(false);
+<Button onClick={() => setSubmitted(true)}>
+  {submitted ? 'Submitted!' : 'Submit'}
+</Button>
+
+// For toggle buttons:
+const [liked, setLiked] = useState(false);
+<Button onClick={() => setLiked(!liked)}>
+  {liked ? 'Unlike' : 'Like'}
+</Button>
+
+CRITICAL: Every button MUST do something. NO dead buttons allowed!
+
+═══════════════════════════════════════════════════════════════════════════════
  IMAGES - USE GRADIENT PLACEHOLDERS (NO EXTERNAL URLS!)
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -67,16 +138,17 @@ EVERY page MUST follow these CRITICAL rules to prevent runtime errors:
 USE GRADIENT PLACEHOLDERS instead:
 
 // Hero backgrounds:
-<section className="min-h-[80vh] bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900">
+  <section className="min-h-[80vh] bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900" >
 
 // Product/Card images:
 const gradients = [
-  'from-indigo-500 to-purple-600',
-  'from-rose-500 to-orange-500',
-  'from-emerald-500 to-teal-500',
-  'from-blue-500 to-cyan-500',
-];
-<div className={\`h-48 bg-gradient-to-br \${gradients[index % gradients.length]}\`} />
+    'from-indigo-500 to-purple-600',
+    'from-rose-500 to-orange-500',
+    'from-emerald-500 to-teal-500',
+    'from-blue-500 to-cyan-500',
+  ];
+  <div className={
+  \`h-48 bg-gradient-to-br \${gradients[index % gradients.length]}\`} />
 
 // Avatar placeholders:
 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
@@ -242,9 +314,55 @@ NEVER use markdown. ALWAYS use <chirAction> tags.`;
   // Format available images for the prompt
   const imagesContext = formatImagesForPrompt(state.availableImages || []);
 
+  // Get dynamic theme from state (generated in blueprint-node)
+  const theme = state.dynamicTheme;
+  const themeContext = theme ? `
+═══════════════════════════════════════════════════════════════════════════════
+ UNIQUE DESIGN THEME: "${theme.palette.name}" (MANDATORY - USE THESE EXACT COLORS)
+═══════════════════════════════════════════════════════════════════════════════
+
+COLOR PALETTE (USE THESE - NOT DEFAULTS):
+- Primary: ${theme.palette.primary}
+- Secondary: ${theme.palette.secondary}  
+- Accent: ${theme.palette.accent}
+- Background: ${theme.palette.background}
+- Surface: ${theme.palette.surface}
+- Style: ${theme.palette.style}
+
+TYPOGRAPHY:
+- Headings: "${theme.fonts.heading}" font-family
+- Body: "${theme.fonts.body}" font-family
+
+LAYOUT PATTERN: "${theme.layout.name}"
+- Hero: ${theme.layout.hero}
+- Sections: ${theme.layout.sections}
+- Cards: ${theme.layout.cards}
+
+ANIMATION STYLE: "${theme.animation.name}"
+- Entrance: ${theme.animation.entrance} animations
+- Hover: ${theme.animation.hover} effects  
+- Scroll: ${theme.animation.scroll} animations
+- Timing: ${theme.animation.timing}
+
+2024-2025 TRENDS TO APPLY:
+${theme.trends.map(t => `- ${t}`).join('\n')}
+
+CRITICAL: Do NOT use default indigo/slate colors. Use the exact hex values above.
+` : `
+═══════════════════════════════════════════════════════════════════════════════
+ DESIGN SYSTEM
+═══════════════════════════════════════════════════════════════════════════════
+- Primary: ${blueprint.designSystem.primaryColor}
+- Secondary: ${blueprint.designSystem.secondaryColor}
+- Accent: ${blueprint.designSystem.accentColor}
+- Style: ${blueprint.designSystem.style}
+`;
+
   const userPrompt = `Generate ALL page components for "${blueprint.projectName}":
 
 ${imagesContext}
+
+${themeContext}
 
 ═══════════════════════════════════════════════════════════════════════════════
  MEMORY CONTEXT (Previously Generated Components)
@@ -263,20 +381,6 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { motion } from 'framer-motion';
 import { ArrowRight, Check, Star } from 'lucide-react';
-
-═══════════════════════════════════════════════════════════════════════════════
- DESIGN SYSTEM
-═══════════════════════════════════════════════════════════════════════════════
-- Primary: ${blueprint.designSystem.primaryColor}
-- Secondary: ${blueprint.designSystem.secondaryColor}
-- Accent: ${blueprint.designSystem.accentColor}
-- Style: ${blueprint.designSystem.style}
-
-MANDATORY COLOR USAGE:
-- Dark sections: bg-slate-900 with text-white headings, text-slate-300 body
-- Light sections: bg-white with text-slate-900 headings, text-slate-700 body
-- CTAs: bg-indigo-600 hover:bg-indigo-700 text-white
-- Cards: bg-white shadow-lg rounded-xl with text-slate-900
 
 ═══════════════════════════════════════════════════════════════════════════════
  BLUEPRINT FEATURES TO IMPLEMENT

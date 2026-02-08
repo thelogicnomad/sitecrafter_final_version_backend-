@@ -73,8 +73,9 @@ function buildGraph() {
         .addNode('core_step', coreNode)
         .addNode('components_step', componentNode)
         .addNode('pages_step', pageNode)
-        .addNode('validation_step', validationNode)
-        .addNode('repair_step', repairNode)
+        // TEMPORARILY DISABLED: Validation and repair nodes
+        // .addNode('validation_step', validationNode)
+        // .addNode('repair_step', repairNode)
 
         // ═══════════════════════════════════════════════════════════════
         // EDGES: Entry Point
@@ -111,40 +112,36 @@ function buildGraph() {
         // Chat response goes straight to end
         .addEdge('chat_response', END)
 
-        // Modification analyzer goes to repair for file modifications
-        .addEdge('modification_analyzer', 'repair_step')
+        // Modification analyzer - TEMPORARILY goes straight to END (repair disabled)
+        .addEdge('modification_analyzer', END)
 
         // Standard creation pipeline edges
         .addEdge('blueprint_step', 'structure_step')
         .addEdge('structure_step', 'core_step')
         .addEdge('core_step', 'components_step')
         .addEdge('components_step', 'pages_step')
-        .addEdge('pages_step', 'validation_step')
 
-        // Conditional edge from validation
-        .addConditionalEdges('validation_step', (state: WebsiteState) => {
-            // If no errors, we're done
-            if (state.errors.length === 0) {
-                console.log('\n Validation passed! No errors.');
-                return 'end';
-            }
+        // TEMPORARILY DISABLED: Skip validation and repair (go directly to end)
+        .addEdge('pages_step', END);
 
-            // If max iterations reached, stop
-            if (state.iterationCount >= 3) {
-                console.log('\n Max iterations reached, stopping.');
-                return 'end';
-            }
-
-            // Otherwise, go to repair
-            console.log(`\n ${state.errors.length} errors found, going to repair...`);
-            return 'repair_step';
-        }, {
-            'repair_step': 'repair_step',
-            'end': END
-        })
-
-        // After repair, go back to validation
-        .addEdge('repair_step', 'validation_step');
+    // COMMENTED OUT: Validation and repair loop
+    // .addEdge('pages_step', 'validation_step')
+    // .addConditionalEdges('validation_step', (state: WebsiteState) => {
+    //     if (state.errors.length === 0) {
+    //         console.log('\n Validation passed! No errors.');
+    //         return 'end';
+    //     }
+    //     if (state.iterationCount >= 3) {
+    //         console.log('\n Max iterations reached, stopping.');
+    //         return 'end';
+    //     }
+    //     console.log(`\n ${state.errors.length} errors found, going to repair...`);
+    //     return 'repair_step';
+    // }, {
+    //     'repair_step': 'repair_step',
+    //     'end': END
+    // })
+    // .addEdge('repair_step', 'validation_step');
 
     return workflow.compile();
 }

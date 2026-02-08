@@ -97,6 +97,26 @@ const gradients = [
 - LIGHT backgrounds: Use text-slate-900, text-gray-900
 - NEVER use gray text on gray backgrounds!
 
+**NO SQUARE BOXES - MANDATORY ROUNDED CORNERS:**
+- ALL cards: rounded-xl or rounded-2xl (NEVER just "rounded")
+- ALL buttons: rounded-lg or rounded-xl
+- ALL image containers: rounded-xl with overflow-hidden
+- ALL containers: rounded-lg minimum
+- Example: className="rounded-2xl overflow-hidden shadow-lg"
+
+**PREMIUM SHADOWS:**
+- Cards: shadow-lg or shadow-xl
+- Hover: hover:shadow-2xl transition-shadow
+- Floating elements: shadow-2xl
+
+**PREMIUM ANIMATIONS (framer-motion):**
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  whileHover={{ scale: 1.02, y: -4 }}
+  transition={{ duration: 0.4 }}
+>
+
 **WEB-SAFE COLOR PALETTE:**
 - Primary: bg-indigo-600, bg-blue-600, bg-violet-600
 - Accent: bg-emerald-500, bg-amber-500, bg-rose-500
@@ -229,14 +249,40 @@ ${imagesContext}
 EXISTING FILES (IMPORT FROM THESE):
 ${existingContext}
 
+${state.dynamicTheme ? `
+═══════════════════════════════════════════════════════════════════════════════
+ UNIQUE DESIGN THEME: "${state.dynamicTheme.palette.name}" (MANDATORY - USE EXACT COLORS)
+═══════════════════════════════════════════════════════════════════════════════
+
+COLOR PALETTE (USE THESE HEX VALUES - NOT DEFAULTS):
+- Primary: ${state.dynamicTheme.palette.primary} (for CTAs, links, highlights)
+- Secondary: ${state.dynamicTheme.palette.secondary} (for secondary actions)
+- Accent: ${state.dynamicTheme.palette.accent} (for badges, notifications)
+- Background: ${state.dynamicTheme.palette.background}
+- Surface: ${state.dynamicTheme.palette.surface}
+- Style: ${state.dynamicTheme.palette.style}
+
+TYPOGRAPHY:
+- Headings: "${state.dynamicTheme.fonts.heading}" font-family
+- Body: "${state.dynamicTheme.fonts.body}" font-family
+
+COMPONENT VARIANTS FOR "${state.dynamicTheme.animation.name}" STYLE:
+- Button hover: ${state.dynamicTheme.animation.hover} effect
+- Card entrance: ${state.dynamicTheme.animation.entrance} animation
+- Scroll triggers: ${state.dynamicTheme.animation.scroll}
+- Timing function: ${state.dynamicTheme.animation.timing}
+
+CRITICAL: Use [${state.dynamicTheme.palette.primary}] as primary color, NOT indigo-600.
+` : `
 ═══════════════════════════════════════════════════════════════════════════════
  DESIGN SYSTEM FOR THIS PROJECT
 ═══════════════════════════════════════════════════════════════════════════════
-- Primary Color: ${blueprint.designSystem.primaryColor} (use for CTAs, links, highlights)
-- Secondary Color: ${blueprint.designSystem.secondaryColor} (use for secondary actions)
-- Accent Color: ${blueprint.designSystem.accentColor} (use for badges, notifications)
+- Primary Color: ${blueprint.designSystem.primaryColor}
+- Secondary Color: ${blueprint.designSystem.secondaryColor}
+- Accent Color: ${blueprint.designSystem.accentColor}
 - Style: ${blueprint.designSystem.style}
 - Fonts: ${blueprint.designSystem.fonts.join(', ')}
+`}
 
 COLOR CONTRAST RULES:
 - On dark (slate-900/gray-900): ALWAYS use text-white or text-slate-100

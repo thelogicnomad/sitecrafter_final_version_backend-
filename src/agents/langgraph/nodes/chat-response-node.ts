@@ -13,10 +13,36 @@ import { WebsiteState } from '../graph-state';
 import OpenAI from 'openai';
 import { retrieveContext } from '../memory-utils';
 
-const openai = new OpenAI({
-    apiKey: process.env.gemini2,
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
-});
+// Multiple API keys for rotation
+const apiKeys = [
+    process.env.gemini8,
+    process.env.gemini9,
+    process.env.gemini10,
+    process.env.gemini11,
+    process.env.gemini,
+    process.env.gemini3,
+    process.env.gemini4,
+    process.env.gemini7,
+    process.env.gemini6,
+    process.env.gemini5,
+    process.env.gemini2,
+].filter(key => key && key.length > 0) as string[];
+
+let currentKeyIndex = 0;
+
+function getClient(): OpenAI {
+    return new OpenAI({
+        apiKey: apiKeys[currentKeyIndex] || process.env.gemini2,
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    });
+}
+
+function rotateApiKey(): void {
+    if (apiKeys.length > 1) {
+        currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+        console.log(`[ChatResponse] Rotated to key ${currentKeyIndex + 1}/${apiKeys.length}`);
+    }
+}
 
 /**
  * Build project context from current state
@@ -118,48 +144,57 @@ INSTRUCTIONS:
 
 Respond naturally as a helpful assistant.`;
 
-    try {
-        const response = await openai.chat.completions.create({
-            model: "gemini-2.5-flash-lite-preview-09-2025",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are a helpful AI assistant that explains project structure and answers questions about web applications. Be specific and mention file paths when relevant."
-                },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.7
-        });
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await getClient().chat.completions.create({
+                model: "gemini-2.5-flash-lite-preview-09-2025",
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are a helpful AI assistant that explains project structure and answers questions about web applications. Be specific and mention file paths when relevant."
+                    },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.7
+            });
 
-        const answer = response.choices[0].message.content || "I couldn't find information about that in this project.";
+            const answer = response.choices[0].message.content || "I couldn't find information about that in this project.";
 
-        console.log(`    Generated response (${answer.length} chars)`);
+            console.log(`    Generated response (${answer.length} chars)`);
 
-        return {
-            chatResponse: answer,
-            messages: [` ${answer}`]
-        };
+            return {
+                chatResponse: answer,
+                messages: [` ${answer}`]
+            };
 
-    } catch (error: any) {
-        console.error('    Chat response failed:', error.message);
-
-        // Provide a basic fallback response
-        let fallbackResponse = "I encountered an error while processing your question. ";
-
-        if (state.files.size > 0) {
-            fallbackResponse += `However, I can tell you that this project has ${state.files.size} files. `;
-
-            if (state.blueprint) {
-                fallbackResponse += `The project is called "${state.blueprint.projectName}" and has ${state.blueprint.pages?.length || 0} pages.`;
+        } catch (error: any) {
+            console.error(`[ChatResponse] Attempt ${attempt} failed:`, error.message);
+            rotateApiKey();
+            if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 1000 * attempt));
+                continue;
             }
         }
-
-        return {
-            chatResponse: fallbackResponse,
-            messages: [` ${fallbackResponse}`]
-        };
     }
+
+    // Fallback after all retries exhausted
+    let fallbackResponse = "I encountered an error while processing your question. ";
+
+    if (state.files.size > 0) {
+        fallbackResponse += `However, I can tell you that this project has ${state.files.size} files. `;
+
+        if (state.blueprint) {
+            fallbackResponse += `The project is called "${state.blueprint.projectName}" and has ${state.blueprint.pages?.length || 0} pages.`;
+        }
+    }
+
+    return {
+        chatResponse: fallbackResponse,
+        messages: [` ${fallbackResponse}`]
+    };
 }
+
 
 /**
  * Store full project context in state for future reference

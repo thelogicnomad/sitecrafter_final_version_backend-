@@ -11,10 +11,36 @@
 import { WebsiteState } from '../graph-state';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-    apiKey: process.env.gemini2,
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
-});
+// Multiple API keys for rotation
+const apiKeys = [
+    process.env.gemini8,
+    process.env.gemini9,
+    process.env.gemini10,
+    process.env.gemini11,
+    process.env.gemini,
+    process.env.gemini3,
+    process.env.gemini4,
+    process.env.gemini7,
+    process.env.gemini6,
+    process.env.gemini5,
+    process.env.gemini2,
+].filter(key => key && key.length > 0) as string[];
+
+let currentKeyIndex = 0;
+
+function getClient(): OpenAI {
+    return new OpenAI({
+        apiKey: apiKeys[currentKeyIndex] || process.env.gemini2,
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    });
+}
+
+function rotateApiKey(): void {
+    if (apiKeys.length > 1) {
+        currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+        console.log(`[IntentRouter] Rotated to key ${currentKeyIndex + 1}/${apiKeys.length}`);
+    }
+}
 
 // Keywords that indicate different intents
 const MODIFY_KEYWORDS = [
@@ -78,50 +104,67 @@ IMPORTANT RULES:
 
 Respond with ONLY ONE WORD: create, modify, question, or explain`;
 
-    try {
-        const response = await openai.chat.completions.create({
-            model: "gemini-2.5-flash-lite-preview-09-2025",
-            messages: [
-                { role: "system", content: "You are an intent classifier. Respond with only one word." },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.1
-        });
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await getClient().chat.completions.create({
+                model: "gemini-2.5-flash-lite-preview-09-2025",
+                messages: [
+                    { role: "system", content: "You are an intent classifier. Respond with only one word." },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.1
+            });
 
-        const intentRaw = response.choices[0].message.content?.toLowerCase().trim() || 'modify';
-        const intent = ['create', 'modify', 'question', 'explain'].includes(intentRaw)
-            ? intentRaw as 'create' | 'modify' | 'question' | 'explain'
-            : hasQuestionKeywords ? 'question' : 'modify';
+            const intentRaw = response.choices[0].message.content?.toLowerCase().trim() || 'modify';
+            const intent = ['create', 'modify', 'question', 'explain'].includes(intentRaw)
+                ? intentRaw as 'create' | 'modify' | 'question' | 'explain'
+                : hasQuestionKeywords ? 'question' : 'modify';
 
-        console.log(` Detected Intent: ${intent.toUpperCase()}`);
-        console.log(` Has existing files: ${hasExistingFiles}`);
-        console.log(` Modify keywords found: ${hasModifyKeywords}`);
-        console.log(` Question keywords found: ${hasQuestionKeywords}`);
+            console.log(` Detected Intent: ${intent.toUpperCase()}`);
+            console.log(` Has existing files: ${hasExistingFiles}`);
+            console.log(` Modify keywords found: ${hasModifyKeywords}`);
+            console.log(` Question keywords found: ${hasQuestionKeywords}`);
 
-        return {
-            requestIntent: intent,
-            isModification: intent === 'modify'
-        };
+            return {
+                requestIntent: intent,
+                isModification: intent === 'modify'
+            };
 
-    } catch (error: any) {
-        console.error('    Intent detection failed:', error.message);
+        } catch (error: any) {
+            console.error(`[IntentRouter] Attempt ${attempt} failed:`, error.message);
+            rotateApiKey();
+            if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 1000 * attempt));
+                continue;
+            }
+            console.error('    Intent detection failed:', error.message);
 
-        // Fallback to keyword-based detection
-        let fallbackIntent: 'create' | 'modify' | 'question' | 'explain' = 'modify';
+            // Fallback to keyword-based detection
+            let fallbackIntent: 'create' | 'modify' | 'question' | 'explain' = 'modify';
 
-        if (!hasExistingFiles) {
-            fallbackIntent = 'create';
-        } else if (hasQuestionKeywords) {
-            fallbackIntent = 'question';
-        } else if (hasModifyKeywords) {
-            fallbackIntent = 'modify';
+            if (!hasExistingFiles) {
+                fallbackIntent = 'create';
+            } else if (hasQuestionKeywords) {
+                fallbackIntent = 'question';
+            } else if (hasModifyKeywords) {
+                fallbackIntent = 'modify';
+            }
+
+            console.log(`    Fallback Intent: ${fallbackIntent}`);
+
+            return {
+                requestIntent: fallbackIntent,
+                isModification: fallbackIntent === 'modify'
+            };
         }
-
-        console.log(`    Fallback Intent: ${fallbackIntent}`);
-
-        return {
-            requestIntent: fallbackIntent,
-            isModification: fallbackIntent === 'modify'
-        };
     }
+
+    // Fallback after all retries exhausted
+    const fallbackIntent: 'create' | 'modify' | 'question' | 'explain' = hasQuestionKeywords ? 'question' : 'modify';
+    console.log(`    Final Fallback Intent: ${fallbackIntent}`);
+    return {
+        requestIntent: fallbackIntent,
+        isModification: fallbackIntent === 'modify'
+    };
 }

@@ -40,7 +40,7 @@ const app: Application = express();
 
 const client = new OpenAI({
   baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-  apiKey: process.env.gemini3
+  apiKey: process.env.gemini6
 });
 
 const openrouter = new OpenAI({

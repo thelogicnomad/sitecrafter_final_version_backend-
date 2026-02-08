@@ -2,10 +2,43 @@ import OpenAI from "openai";
 import { chatCompletionWithRetry } from "../utils/openaiRetry";
 import { text } from '../ui/components';
 
-const client = new OpenAI({
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-  apiKey: process.env.gemini3
-});
+// Multiple API keys for rotation (same pattern as llm-utils.ts)
+const apiKeys = [
+  process.env.gemini8,
+  process.env.gemini9,
+  process.env.gemini10,
+  process.env.gemini11,
+  process.env.gemini,
+  process.env.gemini3,
+  process.env.gemini4,
+  process.env.gemini7,
+  process.env.gemini6,
+  process.env.gemini5,
+  process.env.gemini2,
+].filter(key => key && key.length > 0) as string[];
+
+let currentKeyIndex = 0;
+
+console.log(`[UIService] Using ${apiKeys.length} Gemini API keys`);
+
+if (apiKeys.length === 0) {
+  console.warn('[UIService] No Gemini API keys set!');
+}
+
+function getClient(): OpenAI {
+  const apiKey = apiKeys[currentKeyIndex] || process.env.gemini3;
+  return new OpenAI({
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    apiKey: apiKey
+  });
+}
+
+function rotateApiKey(): void {
+  if (apiKeys.length > 1) {
+    currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+    console.log(`[UIService] Rotated to key ${currentKeyIndex + 1}/${apiKeys.length}`);
+  }
+}
 
 const UI_SELECTION_MODEL = "gemini-2.5-flash-lite-preview-09-2025";
 
@@ -67,10 +100,15 @@ export class UIService {
       console.log('[UIService]  Using cached UI selection');
       return selectionCache.get(cacheKey)!;
     }
-    try {
-      console.log(' Selecting UI components based on requirements...');
 
-      const analysisPrompt = `You are an elite UI/UX design expert selecting components for a PRODUCTION-LEVEL, PREMIUM web application.
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[UIService] Selecting UI components (attempt ${attempt}/${maxRetries}, key ${currentKeyIndex + 1}/${apiKeys.length})...`);
+
+        const analysisPrompt = `You are an elite UI/UX design expert selecting components for a PRODUCTION-LEVEL, PREMIUM web application.
 
  MISSION: Select 4-8 UI components that will make this project STAND OUT as professional, modern, and visually stunning.
 
@@ -109,51 +147,71 @@ CRITICAL REQUIREMENTS:
 - Select 4-8 components for a production-level experience
 - Think like a senior designer building for a premium client`;
 
-      const response: any = await chatCompletionWithRetry(client, {
-        model: UI_SELECTION_MODEL,
-        messages: [{ role: "user", content: analysisPrompt }],
-        temperature: 0.8, // Higher temperature for more creative selections
-      });
+        const client = getClient();
+        const response: any = await chatCompletionWithRetry(client, {
+          model: UI_SELECTION_MODEL,
+          messages: [{ role: "user", content: analysisPrompt }],
+          temperature: 0.8, // Higher temperature for more creative selections
+        });
 
-      let content = response.choices[0]?.message?.content || '{"selectedComponents": []}';
+        let content = response.choices[0]?.message?.content || '{"selectedComponents": []}';
 
-      // Strip markdown code blocks if present
-      content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+        // Strip markdown code blocks if present
+        content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
 
-      console.log(' LLM Selection Response:', content);
+        console.log('[UIService] LLM Selection Response:', content);
 
-      const parsed = JSON.parse(content);
-      const selectedComponentNames = parsed.selectedComponents || [];
+        const parsed = JSON.parse(content);
+        const selectedComponentNames = parsed.selectedComponents || [];
 
-      // Get full component details
-      const selectedComponents = this.getComponentDetails(selectedComponentNames);
+        // Get full component details
+        const selectedComponents = this.getComponentDetails(selectedComponentNames);
 
-      console.log(` Selected ${selectedComponents.length} components:`, selectedComponents.map(c => c.name));
+        console.log(`[UIService] Selected ${selectedComponents.length} components:`, selectedComponents.map(c => c.name));
 
-      // Format for prompt injection
-      const formattedForPrompt = this.formatSelectedComponentsForPrompt(selectedComponents);
+        // Format for prompt injection
+        const formattedForPrompt = this.formatSelectedComponentsForPrompt(selectedComponents);
 
-      console.log('\n FORMATTED UI COMPONENTS OUTPUT (to be appended to detailedContext):');
-      console.log('='.repeat(80));
-      console.log(formattedForPrompt);
-      console.log('='.repeat(80));
-      console.log(` Total length of UI components string: ${formattedForPrompt.length} chars\n`);
+        console.log('\n[UIService] FORMATTED UI COMPONENTS OUTPUT (to be appended to detailedContext):');
+        console.log('='.repeat(80));
+        console.log(formattedForPrompt);
+        console.log('='.repeat(80));
+        console.log(`[UIService] Total length of UI components string: ${formattedForPrompt.length} chars\n`);
 
-      const result = {
-        selectedComponents,
-        formattedForPrompt
-      } as UISelectionResult;
-      selectionCache.set(cacheKey, result);
-      return result;
+        const result = {
+          selectedComponents,
+          formattedForPrompt
+        } as UISelectionResult;
+        selectionCache.set(cacheKey, result);
+        return result;
 
-    } catch (error: any) {
-      console.error(` Error selecting UI components: ${error?.status || ''} ${error?.message || error}`);
-      // Return empty selection on error to not break the flow
-      return {
-        selectedComponents: [],
-        formattedForPrompt: ''
-      };
+      } catch (error: any) {
+        lastError = error;
+        console.error(`[UIService] Error (attempt ${attempt}): ${error?.status || ''} ${error?.message || error}`);
+
+        // Rotate key on rate limits or quota errors
+        if (error?.message?.includes('429') ||
+          error?.message?.includes('quota') ||
+          error?.message?.includes('RESOURCE_EXHAUSTED') ||
+          error?.message?.includes('overloaded')) {
+          console.log('[UIService] Rate limited or quota exceeded, rotating key...');
+          rotateApiKey();
+          await new Promise(resolve => setTimeout(resolve, 2000 + (attempt * 1000)));
+          continue;
+        }
+
+        // For other errors, also rotate and retry
+        rotateApiKey();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
+
+    // All retries exhausted
+    console.error(`[UIService] All ${maxRetries} attempts failed: ${lastError?.message}`);
+    return {
+      selectedComponents: [],
+      formattedForPrompt: ''
+    };
   }
 
   // Get full details for selected component names

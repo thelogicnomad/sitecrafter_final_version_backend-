@@ -171,6 +171,20 @@ export const WebsiteStateAnnotation = Annotation.Root({
         default: () => []
     }),
 
+    // Dynamic design theme for unique project styling
+    dynamicTheme: Annotation<{
+        id: string;
+        palette: { name: string; primary: string; secondary: string; accent: string; background: string; surface: string; style: string };
+        fonts: { heading: string; body: string; mono: string };
+        layout: { name: string; hero: string; sections: string; cards: string };
+        animation: { name: string; entrance: string; hover: string; scroll: string; timing: string };
+        trends: string[];
+        extendedPackages: Record<string, string>;
+    } | null>({
+        reducer: (_, newVal) => newVal,
+        default: () => null
+    }),
+
     // ═══════════════════════════════════════════════════════════════
     // INTELLIGENT ROUTING & MODIFICATION STATE (NEW)
     // ═══════════════════════════════════════════════════════════════
