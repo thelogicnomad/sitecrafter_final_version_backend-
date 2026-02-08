@@ -26,23 +26,44 @@ jobs:
         run: npx tsc
 
   
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
+deploy:
+  needs: build
+  runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+  steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            cd ~/sitecrafter_final_version_backend
-            git pull origin master
-            npm install
-            npx tsc
-            pm2 restart backend
+    - name: Setup SSH key + known_hosts (for debugging)
+      env:
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USER: ${{ secrets.EC2_USER }}
+      run: |
+        set -x
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+
+        # Add host key (avoid interactive prompt). If host unreachable this will fail.
+        ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts || true
+
+        # Quick verbose connection check. This will show whether connection times out,
+        # or connects but fails auth (Permission denied), or succeeds.
+        # BatchMode=yes avoids password prompts and exits on auth failure.
+        ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa -vvv ${EC2_USER}@${EC2_HOST} \
+          "echo 'CONNECTED OK'; hostname; whoami; id; pwd; ls -la ~ || true; pm2 status || true" \
+          || echo "SSH debug step exited with non-zero code (see above for details)"
+
+    - name: Deploy to EC2 via appleboy/ssh-action
+      uses: appleboy/ssh-action@v0.1.10
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}
+        # optional: port: 22
+        script: |
+          cd ~/sitecrafter_final_version_backend
+          git pull origin master
+          npm install
+          npx tsc
+          pm2 restart backend
