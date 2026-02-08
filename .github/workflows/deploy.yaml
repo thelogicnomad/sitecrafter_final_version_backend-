@@ -59,7 +59,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            cd ~/sitecrafter_final_version_backend
+            cd ~/sitecrafter_final_version_backend-
             git pull origin master
             npm install
             npx tsc
