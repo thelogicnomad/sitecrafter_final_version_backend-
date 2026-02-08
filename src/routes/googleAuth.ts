@@ -11,12 +11,12 @@ const generateToken = (user: IUserDocument): string => {
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET is not defined');
   }
-  
+
   return jwt.sign(
-    { 
-      userId: user._id,
+    {
+      userId: user.userId,
       email: user.email,
-      username: user.username 
+      username: user.username
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
@@ -40,18 +40,18 @@ router.get(
 
       const token = generateToken(user);
       const userStr = encodeURIComponent(JSON.stringify({
-        id: user._id,
+        id: user.userId,
         email: user.email,
         username: user.username
       }));
 
       // Make sure frontend_config doesn't end with a slash to prevent double slashes
-      const frontendUrl = frontend_config.endsWith('/') 
-        ? frontend_config.slice(0, -1) 
+      const frontendUrl = frontend_config.endsWith('/')
+        ? frontend_config.slice(0, -1)
         : frontend_config;
-        
-      // Ensure we're using the correct path format
-      res.redirect(`${frontendUrl}/dashboard?token=${token}&user=${userStr}`);
+
+      // Ensure we're using the correct path format - redirect to /agent for consistent login flow
+      res.redirect(`${frontendUrl}/agent?token=${token}&user=${userStr}`);
     } catch (error) {
       console.error('Auth callback error:', error);
       res.redirect(`${frontend_config}/login?error=server_error`);
@@ -77,7 +77,7 @@ router.get('/check-session', (req: Request, res: Response): void => {
     res.json({
       token,
       user: {
-        id: user._id,
+        id: user.userId,
         email: user.email,
         username: user.username
       }

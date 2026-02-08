@@ -1,8 +1,10 @@
 
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 
 export interface IUser {
+  userId: string;  // UUID for external identification
   googleId?: string;
   username: string;
   email: string;
@@ -16,6 +18,13 @@ export interface IUserDocument extends IUser, Document {
 }
 
 const userSchema = new Schema<IUserDocument>({
+  userId: {
+    type: String,
+    required: true,
+    unique: true,
+    default: () => randomUUID(),
+    index: true
+  },
   googleId: { type: String, unique: true, sparse: true },
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },

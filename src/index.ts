@@ -25,6 +25,7 @@ import { UI_UX_DESIGN_PROMPT, DESIGN_IMPLEMENTATION_RULES } from './prompts/ui-d
 import { generateWebsite, GeneratedFile } from './agents/langgraph';
 import { fixCodeError, analyzeCode } from './agents/langgraph/services/error-fixer.service';
 import Project from './models/project';
+import User from './models/user';
 import { analyzeModificationRequest, applyModifications } from './services/modification.service';
 import multer from 'multer';
 import AdmZip from 'adm-zip';
@@ -81,6 +82,27 @@ app.use(passport.session());
 // Auth routes
 app.use('/auth', authRoutes);
 app.use('/auth', googleAuthRoutes);
+
+// Migration endpoint - adds userId to existing users (run once)
+app.post('/api/migrate-users', async (req: Request, res: Response) => {
+  try {
+    const { randomUUID } = await import('crypto');
+    const usersWithoutUserId = await User.find({ userId: { $exists: false } });
+
+    let migrated = 0;
+    for (const user of usersWithoutUserId) {
+      user.userId = randomUUID();
+      await user.save();
+      migrated++;
+    }
+
+    console.log(`Migrated ${migrated} users with new userId`);
+    res.json({ success: true, migratedCount: migrated });
+  } catch (error: any) {
+    console.error('Migration failed:', error.message);
+    res.status(500).json({ error: 'Migration failed', details: error.message });
+  }
+});
 
 // Gemini AI setup
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -1016,25 +1038,28 @@ app.post('/api/projects', async (req: Request, res: Response) => {
 
 /**
  * GET /api/projects
- * Get all projects (filtered by sessionId or userId)
+ * Get all projects (filtered by userId for logged-in users, or sessionId for anonymous)
  */
 app.get('/api/projects', async (req: Request, res: Response) => {
   try {
     const { sessionId, userId } = req.query;
 
-    // Build query to match either sessionId OR userId
-    const orConditions: any[] = [];
-    if (sessionId) orConditions.push({ sessionId });
-    if (userId) orConditions.push({ userId });
-
-    const query = orConditions.length > 0 ? { $or: orConditions } : {};
+    // Build query: userId takes priority (logged-in user), otherwise use sessionId (anonymous)
+    let query: any = {};
+    if (userId) {
+      // Logged-in user: show only their projects
+      query = { userId };
+    } else if (sessionId) {
+      // Anonymous user: show session-based projects
+      query = { sessionId };
+    }
 
     const projects = await Project.find(query)
       .select('_id name prompt fileCount status createdAt updatedAt')
       .sort({ createdAt: -1 })
       .limit(50);
 
-    console.log(` Retrieved ${projects.length} projects`);
+    console.log(` Retrieved ${projects.length} projects for ${userId ? 'user: ' + userId : 'session: ' + sessionId}`);
 
     res.json({ projects });
 

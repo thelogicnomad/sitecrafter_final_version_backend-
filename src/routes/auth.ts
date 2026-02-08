@@ -21,8 +21,8 @@ router.post('/signup', async (req: Request, res: Response<AuthResponse>): Promis
   try {
     const { email, username, password } = req.body;
 
-    const existingUser = await User.findOne({ 
-      $or: [{ email }, { username }] 
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }]
     });
 
     if (existingUser) {
@@ -42,10 +42,8 @@ router.post('/signup', async (req: Request, res: Response<AuthResponse>): Promis
       return;
     }
 
-    const userId = (user._id as string);
-
     const token = jwt.sign(
-      { userId, username: user.username },
+      { userId: user.userId, username: user.username },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -54,7 +52,7 @@ router.post('/signup', async (req: Request, res: Response<AuthResponse>): Promis
       message: 'User created successfully',
       token,
       user: {
-        id: userId,
+        id: user.userId,
         email: user.email,
         username: user.username,
       },
@@ -93,10 +91,8 @@ router.post('/login', async (req: Request, res: Response<AuthResponse>): Promise
       return;
     }
 
-    const userId = (user._id as string);
-
     const token = jwt.sign(
-      { userId, username: user.username },
+      { userId: user.userId, username: user.username },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -104,7 +100,7 @@ router.post('/login', async (req: Request, res: Response<AuthResponse>): Promise
     res.json({
       token,
       user: {
-        id: userId,
+        id: user.userId,
         email: user.email,
         username: user.username,
       },
