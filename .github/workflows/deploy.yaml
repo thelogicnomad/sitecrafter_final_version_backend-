@@ -27,23 +27,22 @@ jobs:
 
   
   deploy:
-    needs: build        
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-      - name: Deploy to EC2
-        run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd ~/sitecrafter_final_version_backend
-          git pull origin master
-          npm install
-          npx tsc
-          pm2 restart backend
-          EOF
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd ~/sitecrafter_final_version_backend
+            git pull origin master
+            npm install
+            npx tsc
+            pm2 restart backend
