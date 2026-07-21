@@ -2,20 +2,42 @@ import type { PlanningResponse, ProjectBlueprint } from '../types/planning.types
 import { OutputParser } from '../utils/parser.utils';
 import { UIService } from './ui.service';
 import { generateDynamicTheme, formatThemeForPrompt, generateResponsivePatterns, DynamicDesignTheme } from './dynamic-trends.service';
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize OpenAI client with Gemini API
-const openai = new OpenAI({
-  apiKey: process.env.gemini,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
-});
+// API key rotation system (same as UIService and llm-utils)
+const apiKeys = [
+  process.env.gemini13,
+  process.env.gemini12,
+  process.env.gemini8,
+  process.env.gemini9,
+  process.env.gemini10,
+  process.env.gemini11,
+  process.env.gemini,
+  process.env.gemini3,
+  process.env.gemini4,
+  process.env.gemini7,
+  process.env.gemini6,
+  process.env.gemini5,
+  process.env.gemini2,
+].filter(key => key && key.length > 0) as string[];
 
-const openai2 = new OpenAI({
-  apiKey: process.env.gemini2,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
-});
+let currentKeyIndex = 0;
 
-const PLANNING_MODEL = "gemini-2.5-flash-lite-preview-09-2025"; // Single model for planning
+console.log(`[PlanningService] Using ${apiKeys.length} Gemini API keys`);
+
+function getCurrentClient(): GoogleGenerativeAI {
+  const apiKey = apiKeys[currentKeyIndex] || process.env.gemini3 || '';
+  return new GoogleGenerativeAI(apiKey);
+}
+
+function rotateApiKey(): void {
+  if (apiKeys.length > 1) {
+    currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+    console.log(`[PlanningService] Rotated to key ${currentKeyIndex + 1}/${apiKeys.length}`);
+  }
+}
+
+const PLANNING_MODEL = "gemini-3.5-flash"; // Single model for planning
 
 interface ProjectAnalysis {
   type: 'frontend' | 'backend' | 'fullstack';
@@ -62,21 +84,22 @@ Focus ONLY on backend architecture. Generate comprehensive specifications includ
 
 Make this TypeScript-based Node.js/Express backend. Be extremely detailed with 8000+ words.`;
 
-    const response = await openai.chat.completions.create({
+    const client = getCurrentClient();
+    const model = client.getGenerativeModel({
       model: PLANNING_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: "You are a backend architecture expert. Generate ultra-detailed TypeScript backend specifications."
-        },
-        {
-          role: "user",
-          content: backendPrompt
-        }
-      ]
+      generationConfig: { temperature: 0.7 }
     });
 
-    return response.choices[0].message.content || blueprint.detailedContext;
+    try {
+      const result = await model.generateContent([{
+        text: `You are a backend architecture expert. Generate ultra-detailed TypeScript backend specifications.\n\n${backendPrompt}`
+      }]);
+      return result.response.text() || blueprint.detailedContext;
+    } catch (error: any) {
+      console.error('[PlanningService] Backend context generation error:', error.message);
+      rotateApiKey();
+      throw error;
+    }
   }
 
 
@@ -404,23 +427,26 @@ Use this structure:
 BEGIN YOUR ULTRA-DETAILED SPECIFICATION NOW:`;
 
     // Make the API call with the autonomous planning prompt
-    const response = await openai2.chat.completions.create({
+    const client = getCurrentClient();
+    const model = client.getGenerativeModel({
       model: PLANNING_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: "You are an autonomous AI agent - an elite full-stack architect. You independently ideate features, make design decisions, and create ultra-detailed specifications for production-ready applications following 2024-2025 trends."
-        },
-        {
-          role: "user",
-          content: frontendPrompt
-        }
-      ],
-      temperature: 0.8, // Higher temperature for more creative feature ideation
-      max_tokens: 16000 // Allow for very detailed specifications
+      generationConfig: { temperature: 0.8 } // Higher temperature for more creative feature ideation
     });
 
-    let frontendContext = response.choices[0].message.content || blueprint.detailedContext;
+    let frontendContext: string;
+    
+    try {
+      const result = await model.generateContent([{
+        text: `You are an autonomous AI agent - an elite full-stack architect. You independently ideate features, make design decisions, and create ultra-detailed specifications for production-ready applications following 2024-2025 trends.\n\n${frontendPrompt}`
+      }]);
+
+      const rawOutput = result.response.text();
+      frontendContext = rawOutput || blueprint.detailedContext;
+    } catch (error: any) {
+      console.error('[PlanningService] Frontend context generation error:', error.message);
+      rotateApiKey();
+      throw error;
+    }
 
     // Add UI components
     console.log('   - Selecting UI components...');
@@ -1331,17 +1357,17 @@ Before returning, ensure:
 
 REMEMBER: This blueprint must enable generation of ENTERPRISE-GRADE, PRODUCTION-READY code. Think professional SaaS application. Make it comprehensive, beautiful, accessible, and feature-rich!`;
 
-      const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
-      const response = await openai.chat.completions.create({
+      const client = getCurrentClient();
+      const model = client.getGenerativeModel({
         model: PLANNING_MODEL,
-        messages: [
-          {
-            role: "user",
-            content: fullPrompt
-          }
-        ]
+        generationConfig: { temperature: 0.7 }
       });
-      const rawOutput = response.choices[0].message.content;
+
+      const result = await model.generateContent([{
+        text: `${systemPrompt}\n\n${userPrompt}`
+      }]);
+
+      const rawOutput = result.response.text();
       console.log(rawOutput);
       if (!rawOutput) {
         throw new Error('No response from AI');

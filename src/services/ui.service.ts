@@ -1,5 +1,4 @@
-import OpenAI from "openai";
-import { chatCompletionWithRetry } from "../utils/openaiRetry";
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { text } from '../ui/components';
 
 // Multiple API keys for rotation (same pattern as llm-utils.ts)
@@ -25,12 +24,9 @@ if (apiKeys.length === 0) {
   console.warn('[UIService] No Gemini API keys set!');
 }
 
-function getClient(): OpenAI {
+function getClient(): GoogleGenerativeAI {
   const apiKey = apiKeys[currentKeyIndex] || process.env.gemini3;
-  return new OpenAI({
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-    apiKey: apiKey
-  });
+  return new GoogleGenerativeAI(apiKey || '');
 }
 
 function rotateApiKey(): void {
@@ -40,7 +36,7 @@ function rotateApiKey(): void {
   }
 }
 
-const UI_SELECTION_MODEL = "gemini-2.5-flash-lite-preview-09-2025";
+const UI_SELECTION_MODEL = "gemini-3.5-flash";
 
 interface UIComponent {
   name: string;
@@ -148,13 +144,16 @@ CRITICAL REQUIREMENTS:
 - Think like a senior designer building for a premium client`;
 
         const client = getClient();
-        const response: any = await chatCompletionWithRetry(client, {
+        const model = client.getGenerativeModel({
           model: UI_SELECTION_MODEL,
-          messages: [{ role: "user", content: analysisPrompt }],
-          temperature: 0.8, // Higher temperature for more creative selections
+          generationConfig: { temperature: 0.8 }
         });
 
-        let content = response.choices[0]?.message?.content || '{"selectedComponents": []}';
+        const apiResult = await model.generateContent([{
+          text: `You are an elite UI/UX design expert. Select the most appropriate UI components based on the user's requirements. Return only valid JSON without markdown code blocks.\n\n${analysisPrompt}`
+        }]);
+
+        let content = apiResult.response.text() || '{"selectedComponents": []}';
 
         // Strip markdown code blocks if present
         content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();

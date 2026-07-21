@@ -25,7 +25,7 @@ const apiKeys = [
 ].filter(key => key && key.length > 0) as string[];
 
 let currentKeyIndex = 0;
-const MODEL = 'gemini-3-flash-preview';
+const MODEL = 'gemini-3.5-flash';
 
 console.log(` LangGraph using ${apiKeys.length} Gemini API keys`);
 console.log(` Model: ${MODEL}`);

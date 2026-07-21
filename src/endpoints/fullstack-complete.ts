@@ -1,7 +1,7 @@
 /**
  * Complete Fullstack Generation with Backend Analysis
  * 1. Generate backend completely
- * 2. Analyze backend with gemini-2.5-flash-lite-preview-09-2025
+ * 2. Analyze backend with gemini-3.5-flash
  * 3. Create detailed backend analysis prompt
  * 4. Merge with frontend requirements
  * 5. Generate integrated frontend
@@ -21,7 +21,7 @@ const backendClient = new OpenAI({
   apiKey: process.env.gemini3
 });
 
-// Client for analysis (gemini-2.5-flash-lite-preview-09-2025)
+// Client for analysis (gemini-3.5-flash)
 const analysisClient = new OpenAI({
   baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
   apiKey: process.env.gemini
@@ -163,10 +163,10 @@ PROVIDE THIS ANALYSIS IN A STRUCTURED FORMAT THAT FRONTEND DEVELOPER CAN UNDERST
       }
     ];
 
-    console.log('📊 Analyzing backend with gemini-2.5-flash-lite-preview-09-2025...\n');
+    console.log('📊 Analyzing backend with gemini-3.5-flash...\n');
 
     const analysisResponse = await analysisClient.chat.completions.create({
-      model: "gemini-2.5-flash-lite-preview-09-2025",
+      model: "gemini-3.5-flash",
       messages: analysisMessages as any,
     });
 

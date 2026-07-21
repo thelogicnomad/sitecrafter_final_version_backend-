@@ -1147,7 +1147,7 @@ IMPORTANT:
 Respond with ONE WORD ONLY: question, explain, or modify`;
 
     const intentResponse = await client.chat.completions.create({
-      model: "gemini-2.5-flash-lite-preview-09-2025",
+      model: "gemini-3.5-flash",
       messages: [
         { role: "system", content: "You are an intent classifier. Respond with only one word." },
         { role: "user", content: intentPrompt }
@@ -1185,7 +1185,7 @@ Answer the user's question specifically:
 - If something doesn't exist, say so clearly`;
 
       const answerResponse = await client.chat.completions.create({
-        model: "gemini-2.5-flash-lite-preview-09-2025",
+        model: "gemini-3.5-flash",
         messages: [
           { role: "system", content: "You answer questions about web projects. Be specific about file locations." },
           { role: "user", content: answerPrompt }
