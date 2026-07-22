@@ -284,7 +284,7 @@ IMPORTANT:
             });
 
             const response = await openai.chat.completions.create({
-                model: "gemini-3.5-flash",
+                model: "gemini-3.5-flash-lite",
                 messages: [
                     {
                         role: "system",

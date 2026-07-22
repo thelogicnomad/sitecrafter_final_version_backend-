@@ -108,7 +108,7 @@ Respond with ONLY ONE WORD: create, modify, question, or explain`;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const response = await getClient().chat.completions.create({
-                model: "gemini-3.5-flash",
+                model: "gemini-3.5-flash-lite",
                 messages: [
                     { role: "system", content: "You are an intent classifier. Respond with only one word." },
                     { role: "user", content: prompt }

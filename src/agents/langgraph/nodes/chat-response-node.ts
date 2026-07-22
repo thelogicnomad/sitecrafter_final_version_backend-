@@ -148,7 +148,7 @@ Respond naturally as a helpful assistant.`;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const response = await getClient().chat.completions.create({
-                model: "gemini-3.5-flash",
+                model: "gemini-3.5-flash-lite",
                 messages: [
                     {
                         role: "system",

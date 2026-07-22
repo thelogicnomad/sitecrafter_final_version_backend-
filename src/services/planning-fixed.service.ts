@@ -37,7 +37,7 @@ function rotateApiKey(): void {
   }
 }
 
-const PLANNING_MODEL = "gemini-3.5-flash"; // Single model for planning
+const PLANNING_MODEL = "gemini-3.5-flash-lite"; // Single model for planning
 
 interface ProjectAnalysis {
   type: 'frontend' | 'backend' | 'fullstack';

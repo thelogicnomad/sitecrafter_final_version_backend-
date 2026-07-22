@@ -36,7 +36,7 @@ function rotateApiKey(): void {
   }
 }
 
-const UI_SELECTION_MODEL = "gemini-3.5-flash";
+const UI_SELECTION_MODEL = "gemini-3.5-flash-lite";
 
 interface UIComponent {
   name: string;
